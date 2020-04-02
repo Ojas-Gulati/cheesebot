@@ -30,6 +30,9 @@ client.on("guildCreate", guild => {
             "players": {},
             "collector": null,
             "playerCount": 0
+        },
+        "stats": {
+
         }
     }
 });
@@ -72,7 +75,7 @@ client.on("message", async message => {
 +avalon mission: tag the people going on a mission when the group agrees on a mission
 +avalon mission cancel: cancel an ongoing mission
 +avalon spectate: get the rolelist of a game you're not in
-+avalon end: end the current game`
++avalon end (evil / good): end the current game. If evil / good is supplied, a win is given to them`
             );
         }
         else if (args[0] === "open") {
@@ -138,7 +141,7 @@ client.on("message", async message => {
                 "percival": ["morgana", "merlin"],
                 "squish": [],
                 "oberon": []
-            }
+            };
             for (var i = 0; i < validroles.length; i++) {
                 dataStore[message.guild.id]["avalon"]["rolelist"][validroles[i]] = [];
             }
@@ -192,7 +195,7 @@ client.on("message", async message => {
                 message.channel.send("Roles have been done and info has been DMed.");
                 order = shuffle(order);
                 message.channel.send("Order: " + order.join(", "));
-                
+
                 fs.writeFileSync("datastore.json", JSON.stringify(dataStore));
             }
 
@@ -241,16 +244,68 @@ client.on("message", async message => {
         }
         else if (args[0] === "end") {
             if (message.author.id === dataStore[message.guild.id]["avalon"]["owner"]) {
-                dataStore[message.guild.id]["avalon"] = {
-                    "inProgress": false,
-                    "starting": false,
-                    "owner": null,
-                    "players": {},
-                    "collector": null,
-                    "playerCount": 0
+                if (args.length > 1) {
+                    if (!(args[1] === "good" || args[1] === "evil")) {
+                        message.channel.send(args[1] + " is not a valid ending (good / evil).");
+                    }
+                    else {
+                        var teams = {
+                            "good": ["merlin", "percival", "squish"],
+                            "evil": ["mordred", "morgana", "assassin", "oberon"]
+                        };
+                        // go through all roles and players
+                        for (var workingrole in dataStore[message.guild.id]["avalon"]["rolelist"]) {
+                            for (var i = 0; i < dataStore[message.guild.id]["avalon"]["rolelist"][workingrole].length; i++) {
+                                // check if the guy has stats: otherwise make them
+                                if (!dataStore[message.guild.id]["stats"].hasOwnProperty(dataStore[message.guild.id]["avalon"]["rolelist"][workingrole][i].id)) {
+                                    dataStore[message.guild.id]["stats"][dataStore[message.guild.id]["avalon"]["rolelist"][workingrole][i].id] = {
+                                        "avalon": {
+                                            "merlin": { "win": 0, "lose": 0 },
+                                            "percival": { "win": 0, "lose": 0 },
+                                            "squish": { "win": 0, "lose": 0 },
+                                            "mordred": { "win": 0, "lose": 0 },
+                                            "morgana": { "win": 0, "lose": 0 },
+                                            "assassin": { "win": 0, "lose": 0 },
+                                            "oberon": { "win": 0, "lose": 0 }
+                                        }
+                                    };
+                                }
+                                if (teams[args[1]].indexOf(workingrole) !== -1) {
+                                    // take a win
+                                    dataStore[message.guild.id]["stats"][dataStore[message.guild.id]["avalon"]["rolelist"][workingrole][i].id]["avalon"][workingrole]["win"] += 1;
+                                }
+                                else {
+                                    dataStore[message.guild.id]["stats"][dataStore[message.guild.id]["avalon"]["rolelist"][workingrole][i].id]["avalon"][workingrole]["lose"] += 1;
+                                }
+                            }
+                        }
+
+                        dataStore[message.guild.id]["avalon"] = {
+                            "inProgress": false,
+                            "starting": false,
+                            "owner": null,
+                            "players": {},
+                            "collector": null,
+                            "playerCount": 0
+                        };
+
+                        message.channel.send("Ended the current game as a " + args[1] + " win.");
+
+                        fs.writeFileSync("datastore.json", JSON.stringify(dataStore));
+                    }
                 }
-                message.channel.send("Ended the current game.");
-                fs.writeFileSync("datastore.json", JSON.stringify(dataStore));
+                else {
+                    dataStore[message.guild.id]["avalon"] = {
+                        "inProgress": false,
+                        "starting": false,
+                        "owner": null,
+                        "players": {},
+                        "collector": null,
+                        "playerCount": 0
+                    };
+                    message.channel.send("Ended the current game with no conclusion.");
+                    fs.writeFileSync("datastore.json", JSON.stringify(dataStore));
+                }
             }
         }
         else if (args[0] === "pass") {
@@ -301,6 +356,49 @@ client.on("message", async message => {
             message.channel.send("My master has ordered me to sleep. Goodnight :)");
             // save everything
             fs.writeFileSync("datastore.json", JSON.stringify(dataStore));
+        }
+    }
+    else if (command === "stats") {
+        if (args[0] === "clear") {
+            if (message.author.id === "451457578900258838") {
+                message.channel.send("All stats cleared for this server.");
+                dataStore[message.guild.id]["stats"] = {};
+                // save everything
+                fs.writeFileSync("datastore.json", JSON.stringify(dataStore));
+            }
+        }
+        else {
+            var toSend = "";
+            message.mentions.users.forEach((user, key, map) => {
+                // check if they have stats
+                if (dataStore[message.guild.id]["stats"].hasOwnProperty(user.id)) {
+                    // add this dudes stats
+                    toSend += user.username + ": \n";
+                    for (var key in dataStore[message.guild.id]["stats"][user.id]["avalon"]) {
+                        toSend += key + " - " + dataStore[message.guild.id]["stats"][user.id]["avalon"][key]["win"] + "W/" + dataStore[message.guild.id]["stats"][user.id]["avalon"][key]["lose"] + "L\n";
+                    }
+                    toSend += "\n";
+                }
+                else {
+                    toSend += user.username + "has no stats. \n\n";
+                }
+            });
+            if (toSend === "") {
+                // return own stats
+                var user = message.author;
+                if (dataStore[message.guild.id]["stats"].hasOwnProperty(user.id)) {
+                    // add this dudes stats
+                    toSend += user.username + ": \n";
+                    for (var key in dataStore[message.guild.id]["stats"][user.id]["avalon"]) {
+                        toSend += key + " - " + dataStore[message.guild.id]["stats"][user.id]["avalon"][key]["win"] + "W/" + dataStore[message.guild.id]["stats"][user.id]["avalon"][key]["lose"] + "L\n";
+                    }
+                    toSend += "\n";
+                }
+                else {
+                    toSend += user.username + "has no stats. \n\n";
+                }
+            }
+            message.channel.send(toSend);
         }
     }
 });
