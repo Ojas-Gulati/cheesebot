@@ -13,6 +13,9 @@ Avalon can be played using the following commands:\
 +avalon mission: tag the people going on a mission when the group agrees on a mission\
 +avalon mission cancel: cancel an ongoing mission\
 +avalon spectate: get the rolelist of a game you're not in\
-+avalon end: end the current game
++avalon end (evil / good): end the current game. If evil / good is supplied, a win is given to them
+
+Check your stats with:\
++stats: tag people to find out their wins and losses on each character.
 
 Have fun!
